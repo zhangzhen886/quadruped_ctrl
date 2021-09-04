@@ -9,11 +9,15 @@ set(CMAKE_BUILD_TYPE "Release")
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
+find_package(Eigen3 REQUIRED)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
   message_generation
+  genmsg
+  actionlib_msgs
+  actionlib
 )
 
 ## System dependencies are found with CMake's conventions
@@ -59,6 +63,7 @@ add_message_files(
 add_service_files(
   FILES
   QuadrupedCmd.srv
+  QuadRLController.srv
 )
 
 ## Generate actions in the 'action' folder
@@ -72,6 +77,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  actionlib_msgs
 )
 
 
@@ -119,6 +125,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 message(STATUS ${PROJECT_SOURCE_DIR})
 include_directories(${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIR}
   include
   include/${PROJECT_NAME}
   src

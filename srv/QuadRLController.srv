@@ -1,0 +1,6 @@
+# command
+float64[] imu_date
+float64[] leg_date
+---
+# results
+float64[] torque

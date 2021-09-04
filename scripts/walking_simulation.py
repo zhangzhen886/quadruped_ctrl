@@ -17,11 +17,13 @@ import pybullet_data
 from pybullet_utils import gazebo_world_parser
 from sensor_msgs.msg import Imu
 from sensor_msgs.msg import Image
+from sensor_msgs.msg import JointState
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import PointField
 from geometry_msgs.msg import Twist
 from quadruped_ctrl.srv import QuadrupedCmd, QuadrupedCmdResponse
+from quadruped_ctrl.srv import QuadRLController, QuadRLControllerResponse
 
 
 get_last_vel = [0] * 3
@@ -119,6 +121,27 @@ def pub_imu_msg(imu_data):
     imu_msg.header.frame_id = "robot"
     pub_imu.publish(imu_msg)
 
+def pub_joint_msg(joint_data):
+    pub_joint = rospy.Publisher("/joint_states", JointState, queue_size=100)
+    joint_msg = JointState()
+    joint_msg.name.append("torso_to_abduct_fr_j")
+    joint_msg.name.append("abduct_fr_to_thigh_fr_j")
+    joint_msg.name.append("thigh_fr_to_knee_fr_j")
+    joint_msg.name.append("torso_to_abduct_fl_j")
+    joint_msg.name.append("abduct_fl_to_thigh_fl_j")
+    joint_msg.name.append("thigh_fl_to_knee_fl_j")
+    joint_msg.name.append("torso_to_abduct_hr_j")
+    joint_msg.name.append("abduct_hr_to_thigh_hr_j")
+    joint_msg.name.append("thigh_hr_to_knee_hr_j")
+    joint_msg.name.append("torso_to_abduct_hl_j")
+    joint_msg.name.append("abduct_hl_to_thigh_hl_j")
+    joint_msg.name.append("thigh_hl_to_knee_hl_j")
+    for i in range(0, 12):
+        joint_msg.position.append(joint_data[i])
+        joint_msg.velocity.append(joint_data[i+12])
+    joint_msg.header.stamp = rospy.Time.now()
+    joint_msg.header.frame_id = "robot"
+    pub_joint.publish(joint_msg)
 
 def get_data_from_sim():
     global get_last_vel
@@ -133,17 +156,19 @@ def get_data_from_sim():
 
     for i in range(4):
         get_orientation.append(pose_orn[1][i])
-    # get_euler = p.getEulerFromQuaternion(get_orientation)
+    get_euler = p.getEulerFromQuaternion(get_orientation)
     get_velocity = p.getBaseVelocity(boxId)
     get_invert = p.invertTransform(pose_orn[0], pose_orn[1])
     get_matrix = p.getMatrixFromQuaternion(get_invert[1])
 
     # IMU data
+    # orientation
     imu_data[3] = pose_orn[1][0]
     imu_data[4] = pose_orn[1][1]
     imu_data[5] = pose_orn[1][2]
     imu_data[6] = pose_orn[1][3]
 
+    # angular_velocity
     imu_data[7] = get_matrix[0] * get_velocity[1][0] + get_matrix[1] * \
         get_velocity[1][1] + get_matrix[2] * get_velocity[1][2]
     imu_data[8] = get_matrix[3] * get_velocity[1][0] + get_matrix[4] * \
@@ -164,11 +189,12 @@ def get_data_from_sim():
 
     # joint data
     joint_state = p.getJointStates(boxId, motor_id_list)
+    # jointPosition 0:abad 1:hip 2:knee
     leg_data[0:12] = [joint_state[0][0], joint_state[1][0], joint_state[2][0],
                       joint_state[3][0], joint_state[4][0], joint_state[5][0],
                       joint_state[6][0], joint_state[7][0], joint_state[8][0],
                       joint_state[9][0], joint_state[10][0], joint_state[11][0]]
-
+    # jointVelocity
     leg_data[12:24] = [joint_state[0][1], joint_state[1][1], joint_state[2][1],
                        joint_state[3][1], joint_state[4][1], joint_state[5][1],
                        joint_state[6][1], joint_state[7][1], joint_state[8][1],
@@ -207,10 +233,11 @@ def reset_robot():
             boxId, j, p.VELOCITY_CONTROL, force=force)
     
     cpp_gait_ctrller.set_robot_mode(convert_type(1))
-    for _ in range(200):
-        run()
-        p.stepSimulation
-    cpp_gait_ctrller.set_robot_mode(convert_type(0))
+    cpp_gait_ctrller.set_gait_type(convert_type(1))
+    # for _ in range(200):
+    #     run()
+    #     p.stepSimulation
+    # cpp_gait_ctrller.set_robot_mode(convert_type(0))
 
 
 def init_simulator():
@@ -296,6 +323,8 @@ def init_simulator():
 
     boxId = p.loadURDF("mini_cheetah/mini_cheetah.urdf", robot_start_pos,
                        useFixedBase=False)
+    # boxId = p.loadURDF(fileName="/home/zhenz/workspaces/quadruped_ctrl_ws/src/quadruped_ctrl/mini_cheetah/mini_cheetah1.urdf",
+    #                    basePosition=robot_start_pos, useFixedBase=False)
     p.changeDynamics(boxId, 3, spinningFriction=spinningFriction)
     p.changeDynamics(boxId, 7, spinningFriction=spinningFriction)
     p.changeDynamics(boxId, 11, spinningFriction=spinningFriction)
@@ -315,10 +344,19 @@ def run():
     #pub msg
     pub_nav_msg(base_pos, imu_data)
     pub_imu_msg(imu_data)
+    pub_joint_msg(leg_data)
 
     # call cpp function to calculate mpc tau
     tau = cpp_gait_ctrller.toque_calculator(convert_type(
         imu_data), convert_type(leg_data))
+    eff = tau.contents.eff
+
+    # call RL server to calculate tau
+    try:
+        robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
+        rl_torque_results = robot_RLcontroller(imu_data, leg_data)
+    except rospy.ServiceException as e:
+        print("Service call failed: %s"%e)
 
     # set tau to simulator
     p.setJointMotorControlArray(bodyUniqueId=boxId,
@@ -529,7 +567,7 @@ if __name__ == '__main__':
         rospy.logerr("cannot find cpp.so file")
     cpp_gait_ctrller = ctypes.cdll.LoadLibrary(so_file)
     cpp_gait_ctrller.toque_calculator.restype = ctypes.POINTER(StructPointer)
-    rospy.loginfo("find so file = " + so_file)
+    rospy.logwarn("find so file = " + so_file)
 
     s = rospy.Service('gait_type', QuadrupedCmd, callback_gait)
     s1 = rospy.Service('robot_mode', QuadrupedCmd, callback_mode)
@@ -537,6 +575,8 @@ if __name__ == '__main__':
 
     init_simulator()
 
+    rospy.loginfo("waitting quad_rl_controller server...")
+    rospy.wait_for_service('quad_rl_controller')
     add_thread = threading.Thread(target=thread_job)
     add_thread.start()
 
