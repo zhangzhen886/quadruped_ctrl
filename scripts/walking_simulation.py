@@ -77,7 +77,7 @@ def callback_mode(req):
 
 
 def callback_body_vel(msg):
-    vel = [msg.linear.x, msg.linear.y, msg.angular.x]
+    vel = [msg.linear.x, msg.linear.y, msg.angular.z]
     cpp_gait_ctrller.set_robot_vel(convert_type(vel))
 
 
@@ -349,7 +349,7 @@ def run():
     # call cpp function to calculate mpc tau
     tau = cpp_gait_ctrller.toque_calculator(convert_type(
         imu_data), convert_type(leg_data))
-    eff = tau.contents.eff
+    eff = tuple(tau.contents.eff)
 
     # call RL server to calculate tau
     try:

@@ -5,6 +5,8 @@ from quadruped_ctrl.srv import QuadRLController, QuadRLControllerResponse
 
 def handle_quad_rl_controller(req):
     rl_torque = []
+    joint_pos = req.leg_data[0:12]
+    joint_vel = req.leg_data[12:24]
     rl_torque.append(0.0)
     rl_torque.append(0.0)
     rl_torque.append(0.0)

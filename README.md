@@ -70,3 +70,10 @@ gait type:
 11:walking2
 ```
 
+### Motion Data
+
+启动名为"quad_rl_controller"的ros server，能够在回调函数中获取到机器人的运动状态数据，数据内容包含以下两个数组：
+
+"imu_date": length 10，
+
+"leg_data": length 24，[0:12]为关节**位置**（弧度制），[12:24]为关节的**角速度**。分别对应**右前腿**关节"fr_abad"、"fr_thigh"、"fr_knee"，**左前腿**关节"fl_abad"、"fl_thigh"、"fl_knee"，**右后腿**关节，以及**左后腿**关节。
