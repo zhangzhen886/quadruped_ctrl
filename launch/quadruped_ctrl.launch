@@ -1,18 +1,24 @@
 <launch>
-        <rosparam command="load" file="$(find quadruped_ctrl)/config/quadruped_ctrl_config.yaml"/>
+  <rosparam command="load" file="$(find quadruped_ctrl)/config/quadruped_ctrl_config.yaml"/>
 
-	<!-- <node name="quadruped" pkg="quadruped_ctrl" type="mainController" respawn="false" output="screen"/> -->
-        <node name="quadruped_simulator" pkg="quadruped_ctrl" type="walking_simulation.py" respawn="false" output="screen"/>
+  <!-- <node name="quadruped" pkg="quadruped_ctrl" type="mainController" respawn="false" output="screen"/> -->
+  <group ns="quad_sim1">
+    <node name="quadruped_simulator" pkg="quadruped_ctrl" type="walking_simulation.py" respawn="false" output="log">
+      <param name="use_rl_controller" value="false"/>
+    </node>
+    <param name="robot_description" textfile="$(find quadruped_ctrl)/mini_cheetah/mini_cheetah1.urdf"/>
+    <!--<node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>-->
+  </group>
 
-        <param name="robot_description"  textfile="$(find quadruped_ctrl)/mini_cheetah/mini_cheetah1.urdf" />
-        <node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher">
-                <!--<param name="publish_frequency" type="double" value="1000.0"/>-->
-        </node>
-        <!--<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher">
-                <param name="/use_gui" value="true"/>
-        </node>-->
+  <group ns="quad_sim2">
+    <node name="quadruped_simulator" pkg="quadruped_ctrl" type="walking_simulation.py" respawn="false" output="screen">
+      <param name="use_rl_controller" value="true"/>
+    </node>
+    <param name="robot_description" textfile="$(find quadruped_ctrl)/mini_cheetah/mini_cheetah1.urdf"/>
+    <!--<node pkg="robot_state_publisher" type="robot_state_publisher" name="robot_state_publisher"/>-->
+  </group>
 
-        <node name="static_broadcaster" pkg="tf2_ros" type="static_transform_publisher"
-              args="0 0 0 0 0 0 robot body" />
-        <node name="rviz" pkg="rviz" type="rviz" args="-d $(find quadruped_ctrl)/rviz/vision.rviz" />
+  <node name="static_broadcaster" pkg="tf2_ros" type="static_transform_publisher"
+        args="0 0 0 0 0 0 robot body"/>
+  <!--<node name="rviz" pkg="rviz" type="rviz" args="-d $(find quadruped_ctrl)/rviz/vision.rviz" />-->
 </launch>

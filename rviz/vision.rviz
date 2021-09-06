@@ -27,7 +27,7 @@ Panels:
     Experimental: false
     Name: Time
     SyncMode: 0
-    SyncSource: PointCloud2
+    SyncSource: ""
 Preferences:
   PromptSaveOnExit: true
 Toolbars:
@@ -58,17 +58,7 @@ Visualization Manager:
       Frame Timeout: 15
       Frames:
         All Enabled: false
-        abduct_fl:
-          Value: true
-        abduct_fr:
-          Value: true
-        abduct_hl:
-          Value: true
-        abduct_hr:
-          Value: true
         body:
-          Value: true
-        cam:
           Value: true
         robot:
           Value: true
@@ -80,16 +70,6 @@ Visualization Manager:
           Value: true
         shank_hr:
           Value: true
-        tar:
-          Value: true
-        thigh_fl:
-          Value: true
-        thigh_fr:
-          Value: true
-        thigh_hl:
-          Value: true
-        thigh_hr:
-          Value: true
         toe_fl:
           Value: true
         toe_fr:
@@ -98,41 +78,13 @@ Visualization Manager:
           Value: true
         toe_hr:
           Value: true
-        world:
-          Value: true
       Marker Scale: 0.5
       Name: TF
       Show Arrows: true
       Show Axes: true
       Show Names: true
       Tree:
-        world:
-          cam:
-            {}
-          robot:
-            body:
-              abduct_fl:
-                thigh_fl:
-                  shank_fl:
-                    toe_fl:
-                      {}
-              abduct_fr:
-                thigh_fr:
-                  shank_fr:
-                    toe_fr:
-                      {}
-              abduct_hl:
-                thigh_hl:
-                  shank_hl:
-                    toe_hl:
-                      {}
-              abduct_hr:
-                thigh_hr:
-                  shank_hr:
-                    toe_hr:
-                      {}
-          tar:
-            {}
+        {}
       Update Interval: 0
       Value: true
     - Alpha: 1
@@ -166,7 +118,7 @@ Visualization Manager:
       Use rainbow: true
       Value: true
     - Class: rviz/Image
-      Enabled: false
+      Enabled: true
       Image Topic: /cam0/image_raw
       Max Value: 1
       Median window: 5
@@ -176,12 +128,12 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: false
+      Value: true
     - Alpha: 1
       Buffer Length: 1
       Class: rviz/Path
       Color: 25; 255; 0
-      Enabled: true
+      Enabled: false
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
@@ -199,9 +151,9 @@ Visualization Manager:
       Shaft Length: 0.10000000149011612
       Topic: /vins_estimator/path
       Unreliable: false
-      Value: true
+      Value: false
     - Class: rviz/Image
-      Enabled: true
+      Enabled: false
       Image Topic: /vins_estimator/image_track
       Max Value: 1
       Median window: 5
@@ -211,7 +163,7 @@ Visualization Manager:
       Queue Size: 2
       Transport Hint: raw
       Unreliable: false
-      Value: true
+      Value: false
     - Angle Tolerance: 0.10000000149011612
       Class: rviz/Odometry
       Covariance:
@@ -249,66 +201,18 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz/RobotModel
       Collision Enabled: true
-      Enabled: true
-      Joints:
+      Enabled: false
+      Links:
         All Links Enabled: true
         Expand Joint Details: false
         Expand Link Details: false
         Expand Tree: false
-        Link Tree Style: Joints in Alphabetic Order
-        abduct_fl_to_thigh_fl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        abduct_fr_to_thigh_fr_j:
-          Show Axes: false
-          Show Joint Axis: false
-        abduct_hl_to_thigh_hl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        abduct_hr_to_thigh_hr_j:
-          Show Axes: false
-          Show Joint Axis: false
-        thigh_fl_to_knee_fl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        thigh_fr_to_knee_fr_j:
-          Show Axes: false
-          Show Joint Axis: false
-        thigh_hl_to_knee_hl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        thigh_hr_to_knee_hr_j:
-          Show Axes: false
-          Show Joint Axis: false
-        toe_fl_joint:
-          Show Axes: false
-          Value: true
-        toe_fr_joint:
-          Show Axes: false
-          Value: true
-        toe_hl_joint:
-          Show Axes: false
-          Value: true
-        toe_hr_joint:
-          Show Axes: false
-          Value: true
-        torso_to_abduct_fl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        torso_to_abduct_fr_j:
-          Show Axes: false
-          Show Joint Axis: false
-        torso_to_abduct_hl_j:
-          Show Axes: false
-          Show Joint Axis: false
-        torso_to_abduct_hr_j:
-          Show Axes: false
-          Show Joint Axis: false
+        Link Tree Style: Links in Alphabetic Order
       Name: RobotModel
       Robot Description: robot_description
       TF Prefix: ""
       Update Interval: 0
-      Value: true
+      Value: false
       Visual Enabled: false
   Enabled: true
   Global Options:
@@ -356,7 +260,7 @@ Visualization Manager:
       Pitch: 0.28539812564849854
       Target Frame: <Fixed Frame>
       Value: XYOrbit (rviz)
-      Yaw: 2.2654061317443848
+      Yaw: 2.25040602684021
     Saved: ~
 Window Geometry:
   Displays:

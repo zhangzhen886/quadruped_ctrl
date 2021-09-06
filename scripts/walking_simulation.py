@@ -22,6 +22,7 @@ from nav_msgs.msg import Odometry
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs.msg import PointField
 from geometry_msgs.msg import Twist
+from std_srvs.srv import SetBool, SetBoolResponse
 from quadruped_ctrl.srv import QuadrupedCmd, QuadrupedCmdResponse
 from quadruped_ctrl.srv import QuadRLController, QuadRLControllerResponse
 
@@ -31,6 +32,8 @@ robot_height = 0.30
 motor_id_list = [0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14]
 init_new_pos = [0.0, -0.8, 1.6, 0.0, -0.8, 1.6, 0.0, -0.8, 1.6, 0.0, -0.8, 1.6,
                 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+reset_flag1 = False
 
 
 class StructPointer(ctypes.Structure):
@@ -75,6 +78,13 @@ def callback_mode(req):
     cpp_gait_ctrller.set_robot_mode(convert_type(req.cmd))
     return QuadrupedCmdResponse(0, "get the mode")
 
+def callback_reset(req):
+    global reset_flag1
+    if req.data is True:
+        reset_flag1 = True
+        return SetBoolResponse(True, "reset the robot")
+    else:
+        return SetBoolResponse(False, "reset the robot")
 
 def callback_body_vel(msg):
     vel = [msg.linear.x, msg.linear.y, msg.angular.z]
@@ -88,7 +98,7 @@ def acc_filter(value, last_accValue):
 
 
 def pub_nav_msg(base_pos, imu_data):
-    pub_odom = rospy.Publisher("/robot_odom", Odometry, queue_size=100)
+    pub_odom = rospy.Publisher("robot_odom", Odometry, queue_size=100)
     odom = Odometry()
     odom.header.stamp = rospy.Time.now()
     odom.header.frame_id ="world"
@@ -100,12 +110,11 @@ def pub_nav_msg(base_pos, imu_data):
     odom.pose.pose.orientation.y = imu_data[4]
     odom.pose.pose.orientation.z = imu_data[5]
     odom.pose.pose.orientation.w = imu_data[6]
-
     pub_odom.publish(odom)
 
 
 def pub_imu_msg(imu_data):
-    pub_imu = rospy.Publisher("/imu0", Imu, queue_size=100)
+    pub_imu = rospy.Publisher("imu0", Imu, queue_size=100)
     imu_msg = Imu()
     imu_msg.linear_acceleration.x = imu_data[0]
     imu_msg.linear_acceleration.y = imu_data[1]
@@ -122,7 +131,7 @@ def pub_imu_msg(imu_data):
     pub_imu.publish(imu_msg)
 
 def pub_joint_msg(joint_data):
-    pub_joint = rospy.Publisher("/joint_states", JointState, queue_size=100)
+    pub_joint = rospy.Publisher("joint_states", JointState, queue_size=100)
     joint_msg = JointState()
     joint_msg.name.append("torso_to_abduct_fr_j")
     joint_msg.name.append("abduct_fr_to_thigh_fr_j")
@@ -338,6 +347,7 @@ def init_simulator():
 
 
 def run():
+    global use_rl_controller
     # get data from simulator
     imu_data, leg_data, base_pos = get_data_from_sim()
 
@@ -354,15 +364,25 @@ def run():
     # call RL server to calculate tau
     try:
         robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
-        rl_torque_results = robot_RLcontroller(imu_data, leg_data, eff)
+        rl_torque_results = robot_RLcontroller(imu_data, leg_data, eff).torque
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 
     # set tau to simulator
-    p.setJointMotorControlArray(bodyUniqueId=boxId,
-                                jointIndices=motor_id_list,
-                                controlMode=p.TORQUE_CONTROL,
-                                forces=tau.contents.eff)
+    if use_rl_controller is False:
+        rospy.loginfo("call robot MPC Controller.")
+        p.setJointMotorControlArray(bodyUniqueId=boxId,
+                                    jointIndices=motor_id_list,
+                                    controlMode=p.TORQUE_CONTROL,
+                                    forces=tau.contents.eff)
+    else:
+        if len(rl_torque_results) == 12:
+            rospy.logwarn("call robot RLController done!")
+            p.setJointMotorControlArray(bodyUniqueId=boxId,
+                                        jointIndices=motor_id_list,
+                                        controlMode=p.TORQUE_CONTROL,
+                                        forces=rl_torque_results)
+        else: rospy.logerr("call robot RLController failed.")
 
     # reset visual cam
     # p.resetDebugVisualizerCamera(2.5, 45, -30, base_pos)
@@ -384,8 +404,8 @@ def camera_update():
     cameraUpVector = [45, 45, 0]
     pub_pointcloud = PointCloud2()
     pub_image = Image()
-    pointcloud_publisher = rospy.Publisher("/generated_pc", PointCloud2, queue_size=10)
-    image_publisher = rospy.Publisher("/cam0/image_raw", Image, queue_size=10)
+    pointcloud_publisher = rospy.Publisher("generated_pc", PointCloud2, queue_size=10)
+    image_publisher = rospy.Publisher("cam0/image_raw", Image, queue_size=10)
 
     robot_tf = tf.TransformBroadcaster()
 
@@ -512,12 +532,18 @@ def camera_update():
 
 
 def main():
+    global reset_flag1
     cnt = 0
     rate = rospy.Rate(freq)  # hz
     reset_flag = p.readUserDebugParameter(reset)
     low_energy_flag = p.readUserDebugParameter(low_energy_mode)
     high_performance_flag = p.readUserDebugParameter(high_performance_mode)
     while not rospy.is_shutdown():
+        if reset_flag1 is True:
+            reset_flag1 = False
+            rospy.logwarn("reset the robot")
+            cnt = 0
+            reset_robot()
         # check reset button state
         if(reset_flag < p.readUserDebugParameter(reset)):
             reset_flag = p.readUserDebugParameter(reset)
@@ -544,6 +570,8 @@ def main():
 if __name__ == '__main__':
     rospy.init_node('quadruped_simulator', anonymous=True)
 
+    # load ros param
+    use_rl_controller = rospy.get_param('~use_rl_controller', False)
     terrain = rospy.get_param('/simulation/terrain')
     camera = rospy.get_param('/simulation/camera')
     lateralFriction = rospy.get_param('/simulation/lateralFriction')
@@ -556,6 +584,7 @@ if __name__ == '__main__':
     rospy.loginfo("lateralFriction = " + str(lateralFriction) + " spinningFriction = " + str(spinningFriction))
     rospy.loginfo(" freq = " + str(freq) + " PID = " + str([stand_kp, stand_kd, joint_kp, joint_kd]))
 
+    # load cpp library
     rospack = rospkg.RosPack()
     path = rospack.get_path('quadruped_ctrl')
     so_file = path.replace('src/quadruped_ctrl',
@@ -569,14 +598,17 @@ if __name__ == '__main__':
     cpp_gait_ctrller.toque_calculator.restype = ctypes.POINTER(StructPointer)
     rospy.logwarn("find so file = " + so_file)
 
+    # add ros server and subscriber
     s = rospy.Service('gait_type', QuadrupedCmd, callback_gait)
     s1 = rospy.Service('robot_mode', QuadrupedCmd, callback_mode)
+    s2 = rospy.Service('robot_reset', SetBool, callback_reset)
     rospy.Subscriber("cmd_vel", Twist, callback_body_vel, buff_size=10000)
 
     init_simulator()
 
     rospy.loginfo("waitting quad_rl_controller server...")
     rospy.wait_for_service('quad_rl_controller')
+    rospy.loginfo("server done. start threading...")
     add_thread = threading.Thread(target=thread_job)
     add_thread.start()
 
