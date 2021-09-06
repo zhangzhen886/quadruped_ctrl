@@ -1,4 +1,5 @@
 # command
+float64[] pos_data
 float64[] imu_data
 float64[] leg_data
 float64[] tau_data
