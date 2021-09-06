@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import threading
 import rospy
 from geometry_msgs.msg import Twist
 from quadruped_ctrl.srv import QuadRLController, QuadRLControllerResponse
@@ -21,10 +22,18 @@ def callback_vel(msgs):
     cmd.append(msgs.linear.y)
     cmd.append(msgs.angular.z)
 
+def thread_job():
+    rospy.spin()
 
 if __name__ == "__main__":
     rospy.init_node('test_quadcontroller_server')
     rospy.Subscriber("cmd_vel", Twist, callback_vel, buff_size=100)
     s = rospy.Service('quad_rl_controller', QuadRLController, handle_quad_rl_controller)
     rospy.loginfo("Start quad_rl_controller Service.")
-    rospy.spin()
+    add_thread = threading.Thread(target=thread_job)
+    add_thread.start()
+    # rospy.spin()
+    rospy.loginfo("Start a spinning thread!")
+    rate = rospy.Rate(250)  # hz
+    while not rospy.is_shutdown():
+        rate.sleep()
