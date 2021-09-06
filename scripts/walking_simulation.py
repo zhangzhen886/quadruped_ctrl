@@ -354,7 +354,7 @@ def run():
     # call RL server to calculate tau
     try:
         robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
-        rl_torque_results = robot_RLcontroller(imu_data, leg_data)
+        rl_torque_results = robot_RLcontroller(imu_data, leg_data, eff)
     except rospy.ServiceException as e:
         print("Service call failed: %s"%e)
 

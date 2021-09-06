@@ -1,6 +1,7 @@
 # command
 float64[] imu_data
 float64[] leg_data
+float64[] tau_data
 ---
 # results
 float64[] torque
