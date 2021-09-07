@@ -130,7 +130,7 @@ def pub_imu_msg(imu_data):
     imu_msg.header.frame_id = "robot"
     pub_imu.publish(imu_msg)
 
-def pub_joint_msg(joint_data):
+def pub_joint_msg(joint_data, eff):
     pub_joint = rospy.Publisher("joint_states", JointState, queue_size=100)
     joint_msg = JointState()
     joint_msg.name.append("torso_to_abduct_fr_j")
@@ -148,6 +148,7 @@ def pub_joint_msg(joint_data):
     for i in range(0, 12):
         joint_msg.position.append(joint_data[i])
         joint_msg.velocity.append(joint_data[i+12])
+        joint_msg.effort.append(eff[i])
     joint_msg.header.stamp = rospy.Time.now()
     joint_msg.header.frame_id = "robot"
     pub_joint.publish(joint_msg)
@@ -185,7 +186,7 @@ def get_data_from_sim():
     imu_data[9] = get_matrix[6] * get_velocity[1][0] + get_matrix[7] * \
         get_velocity[1][1] + get_matrix[8] * get_velocity[1][2]
 
-    # calculate the acceleration of the robot
+    # calculate the linear_acceleration of the robot
     linear_X = (get_velocity[0][0] - get_last_vel[0]) * freq
     linear_Y = (get_velocity[0][1] - get_last_vel[1]) * freq
     linear_Z = 9.8 + (get_velocity[0][2] - get_last_vel[2]) * freq
@@ -227,14 +228,13 @@ def reset_robot():
     p.resetBaseVelocity(boxId, [0, 0, 0], [0, 0, 0])
     for j in range(12):
         p.resetJointState(boxId, motor_id_list[j], init_new_pos[j], init_new_pos[j+12])
-    cpp_gait_ctrller.init_controller(convert_type(
-        freq), convert_type([stand_kp, stand_kd, joint_kp, joint_kd]))
+    cpp_gait_ctrller.init_controller(
+        convert_type(freq), convert_type([stand_kp, stand_kd, joint_kp, joint_kd]))
 
     for _ in range(10):
         p.stepSimulation()
         imu_data, leg_data, _ = get_data_from_sim()
-        cpp_gait_ctrller.pre_work(convert_type(
-            imu_data), convert_type(leg_data))
+        cpp_gait_ctrller.pre_work(convert_type(imu_data), convert_type(leg_data))
 
     for j in range(16):
         force = 0
@@ -351,34 +351,30 @@ def run():
     # get data from simulator
     imu_data, leg_data, base_pos = get_data_from_sim()
 
-    #pub msg
-    pub_nav_msg(base_pos, imu_data)
-    pub_imu_msg(imu_data)
-    pub_joint_msg(leg_data)
-
     # call cpp function to calculate mpc tau
     tau = cpp_gait_ctrller.toque_calculator(convert_type(
         imu_data), convert_type(leg_data))
-    eff = tuple(tau.contents.eff)
-
-    rl_torque_results = tuple()
-    # call RL server to calculate tau
-    try:
-        robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
-        rl_torque_results = robot_RLcontroller(base_pos, imu_data, leg_data, eff).torque
-    except rospy.ServiceException as e:
-        print("Service call failed: %s"%e)
+    eff_data = tuple(tau.contents.eff)
 
     # set tau to simulator
     if use_rl_controller is False:
-        rospy.loginfo("call robot MPC Controller.")
+        # rospy.loginfo("call robot MPC Controller.")
         p.setJointMotorControlArray(bodyUniqueId=boxId,
                                     jointIndices=motor_id_list,
                                     controlMode=p.TORQUE_CONTROL,
-                                    forces=tau.contents.eff)
+                                    forces=eff_data)
     else:
+        rl_torque_results = tuple()
+        # call RL server to calculate tau
+        try:
+            # rospy.loginfo("call robot RLController server...")
+            robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
+            rl_torque_results = robot_RLcontroller(base_pos, imu_data, leg_data, eff_data).torque
+        except rospy.ServiceException as e:
+            print("Service call failed: %s"%e)
+
         if len(rl_torque_results) == 12:
-            rospy.logwarn("call robot RLController done!")
+            # rospy.logwarn("call robot RLController done!")
             p.setJointMotorControlArray(bodyUniqueId=boxId,
                                         jointIndices=motor_id_list,
                                         controlMode=p.TORQUE_CONTROL,
@@ -387,6 +383,11 @@ def run():
 
     # reset visual cam
     # p.resetDebugVisualizerCamera(2.5, 45, -30, base_pos)
+
+    # pub ros msg
+    pub_nav_msg(base_pos, imu_data)
+    pub_imu_msg(imu_data)
+    pub_joint_msg(leg_data, eff_data)
 
     p.stepSimulation()
     return
@@ -560,7 +561,6 @@ def main():
             cpp_gait_ctrller.set_robot_mode(convert_type(0))
         
         run()
-
         cnt += 1
         if cnt > 99999999:
             cnt = 99999999
