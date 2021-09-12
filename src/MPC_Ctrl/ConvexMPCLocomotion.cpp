@@ -113,6 +113,45 @@ void ConvexMPCLocomotion::_SetupCommand(
   _pitch_des = 0.;
 }
 
+//设置期望值
+void ConvexMPCLocomotion::_SetupCommandForStand(
+    StateEstimatorContainer<float>& _stateEstimator,
+    std::vector<double> gamepadCommand) {
+
+  float x_vel_cmd, y_vel_cmd, yaw_vel_cmd;
+  float roll_filter(0.1), pitch_filter(0.1);
+
+  //手柄数据先暂时设置为0，后面再给手柄赋值   旋转角速度和x,y方向上的线速度
+  x_vel_cmd = gamepadCommand[0];
+  y_vel_cmd = gamepadCommand[1];
+  yaw_vel_cmd = gamepadCommand[2];
+
+  _x_vel_des = 0.0;
+  _y_vel_des = 0.0;
+  _yaw_turn_rate = 0.0;
+
+  //涉及到了状态估计中的欧拉角
+  _yaw_des = _stateEstimator.getResult().rpy[2] + dt * _yaw_turn_rate;
+  //确保机器人不会因为摩擦力的原因在yaw方向产生旋转误差
+  if((abs(_stateEstimator.getResult().rpy[2] - _yaw_des_true) > 5.0)){
+    // _yaw_des_true = 3.14 * _stateEstimator.getResult().rpy[2] / abs(_stateEstimator.getResult().rpy[2]);
+    _yaw_des_true = _stateEstimator.getResult().rpy[2];
+  }
+  _yaw_des_true =_yaw_des_true + dt * _yaw_turn_rate;
+
+  _roll_des = _roll_des * (1 - roll_filter) + gamepadCommand[2] * roll_filter;
+  _pitch_des = _pitch_des * (1 - pitch_filter) + gamepadCommand[3] * pitch_filter;
+  _body_height = 0.25 + gamepadCommand[0] / 10.0;
+  if (_roll_des > 0.35)
+    _roll_des = 0.35;
+  else if (_roll_des < -0.35)
+    _roll_des = -0.35;
+  if (_pitch_des > 0.35)
+    _pitch_des = 0.35;
+  else if (_pitch_des < -0.35)
+    _pitch_des = -0.35;
+}
+
 template <>
 void ConvexMPCLocomotion::run(Quadruped<float>& _quadruped,
                               LegController<float>& _legController,
@@ -121,8 +160,13 @@ void ConvexMPCLocomotion::run(Quadruped<float>& _quadruped,
                               std::vector<double> gamepadCommand,
                               int gaitType, int robotMode) {
   bool omniMode = false;
-  // Command Setup
-  _SetupCommand(_stateEstimator, gamepadCommand);
+  if (robotMode == 0 && gaitType == 4) {
+    // Stand Mode Setup
+    _SetupCommandForStand(_stateEstimator, gamepadCommand);
+  } else {
+    // Command Setup
+    _SetupCommand(_stateEstimator, gamepadCommand);
+  }
 
   gaitNumber = gaitType;  // data.userParameters->cmpc_gait; 步态默认为trot
 
@@ -148,6 +192,7 @@ void ConvexMPCLocomotion::run(Quadruped<float>& _quadruped,
   // pick gait
   Gait* gait = &trotting;
   if(robotMode == 0) {
+    // 0, high peformance mode
     if (gaitNumber == 1)
       gait = &bounding;
     else if (gaitNumber == 2)
@@ -171,14 +216,15 @@ void ConvexMPCLocomotion::run(Quadruped<float>& _quadruped,
     else if (gaitNumber == 11)
       gait = &walking2;
   } else if(robotMode == 1) {
+    // 1, low peformance mode
     int h = 10;
     double vBody = sqrt(_x_vel_des*_x_vel_des)+(_y_vel_des*_y_vel_des);
     gait = &aio;
-    gaitNumber == 9;
+    gaitNumber = 9;
     if(gait->getCurrentGaitPhase() == 0) {
       if(vBody < 0.002) {
         if(abs(_yaw_turn_rate) < 0.01) {
-          gaitNumber == 4;
+          gaitNumber = 4;
           if(gait->getGaitHorizon() != h) {
             iterationCounter = 0;
           }

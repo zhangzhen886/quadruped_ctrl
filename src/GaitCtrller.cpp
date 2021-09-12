@@ -109,6 +109,11 @@ void GaitCtrller::SetRobotVel(double* vel) {
   } else {
   _gamepadCommand[2] = vel[2] * 1.0;
   }
+  if (abs(vel[3]) < 0.03) {
+    _gamepadCommand[3] = 0.0;
+  } else {
+    _gamepadCommand[3] = vel[3] * 1.0;
+  }
   // std::cout << "set vel to: " << _gamepadCommand[0] << " " << _gamepadCommand[1]
   //           << " " << _gamepadCommand[2] << std::endl;
 }

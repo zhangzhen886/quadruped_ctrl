@@ -123,6 +123,10 @@ class QuadSimulator:
         rospy.loginfo("server done. start threading...")
 
 
+    def callback_body_vel(self, msg):
+        vel = [msg.linear.x, msg.linear.y, msg.angular.x, msg.angular.y]
+        self.cpp_gait_ctrller.set_robot_vel(convert_type(vel))
+
     def callback_gait(self, req):
         self.cpp_gait_ctrller.set_gait_type(convert_type(req.cmd))
         return QuadrupedCmdResponse(0, "get the gait")
@@ -138,22 +142,18 @@ class QuadSimulator:
         else:
             return SetBoolResponse(False, "reset the robot")
 
-    def callback_body_vel(self, msg):
-        vel = [msg.linear.x, msg.linear.y, msg.angular.z]
-        self.cpp_gait_ctrller.set_robot_vel(convert_type(vel))
-
-    def pub_nav_msg(self, base_pos, imu_data):
+    def pub_nav_msg(self, body_data, imu_data):
         odom = Odometry()
-        odom.header.stamp = rospy.Time.now()
-        odom.header.frame_id ="world"
-        odom.child_frame_id = "world"
-        odom.pose.pose.position.x = base_pos[0]
-        odom.pose.pose.position.y = base_pos[1]
-        odom.pose.pose.position.z = base_pos[2]
+        odom.pose.pose.position.x = body_data[0]
+        odom.pose.pose.position.y = body_data[1]
+        odom.pose.pose.position.z = body_data[2]
         odom.pose.pose.orientation.x = imu_data[3]
         odom.pose.pose.orientation.y = imu_data[4]
         odom.pose.pose.orientation.z = imu_data[5]
         odom.pose.pose.orientation.w = imu_data[6]
+        odom.header.stamp = rospy.Time.now()
+        odom.header.frame_id ="world"
+        odom.child_frame_id = "world"
         self.pub_odom.publish(odom)
 
     def pub_imu_msg(self, imu_data):
@@ -201,6 +201,7 @@ class QuadSimulator:
         get_invert = []
         imu_data = [0] * 10
         leg_data = [0] * 24
+        body_data = [0] * 6
 
         pose_orn = p.getBasePositionAndOrientation(self.boxId)
 
@@ -210,6 +211,14 @@ class QuadSimulator:
         get_velocity = p.getBaseVelocity(self.boxId)
         get_invert = p.invertTransform(pose_orn[0], pose_orn[1])
         get_matrix = p.getMatrixFromQuaternion(get_invert[1])
+
+        # Body pose data
+        body_data[0] = pose_orn[0][0]
+        body_data[1] = pose_orn[0][1]
+        body_data[2] = pose_orn[0][2]
+        body_data[3] = get_euler[0]
+        body_data[4] = get_euler[1]
+        body_data[5] = get_euler[2]
 
         # IMU data
         # orientation
@@ -255,7 +264,8 @@ class QuadSimulator:
         self.get_last_vel = []
         self.get_last_vel = com_velocity
 
-        return imu_data, leg_data, pose_orn[0]
+        # return imu_data, leg_data, pose_orn[0]
+        return imu_data, leg_data, body_data
 
 
     def reset_robot(self):
@@ -281,8 +291,8 @@ class QuadSimulator:
             p.setJointMotorControl2(
                 self.boxId, j, p.VELOCITY_CONTROL, force=force)
 
-        self.cpp_gait_ctrller.set_robot_mode(convert_type(1))
-        self.cpp_gait_ctrller.set_gait_type(convert_type(1))
+        self.cpp_gait_ctrller.set_robot_mode(convert_type(0))
+        self.cpp_gait_ctrller.set_gait_type(convert_type(4))
         # for _ in range(200):
         #     run()
         #     p.stepSimulation
@@ -388,7 +398,7 @@ class QuadSimulator:
 
     def run(self):
         # get data from simulator
-        imu_data, leg_data, base_pos = self.get_data_from_sim()
+        imu_data, leg_data, body_data = self.get_data_from_sim()
 
         # call cpp function to calculate mpc tau
         tau = self.cpp_gait_ctrller.toque_calculator(convert_type(
@@ -408,7 +418,7 @@ class QuadSimulator:
             try:
                 # rospy.loginfo("call robot RLController server...")
                 robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
-                rl_torque_results = robot_RLcontroller(base_pos, imu_data, leg_data, eff_data).torque
+                rl_torque_results = robot_RLcontroller(body_data, imu_data, leg_data, eff_data).torque
             except rospy.ServiceException as e:
                 print("Service call failed: %s"%e)
 
@@ -421,10 +431,10 @@ class QuadSimulator:
             else: rospy.logerr("call robot RLController failed.")
 
         # reset visual cam
-        # p.resetDebugVisualizerCamera(2.5, 45, -30, base_pos)
+        # p.resetDebugVisualizerCamera(2.5, 45, -30, body_data)
 
         # pub ros msg
-        self.pub_nav_msg(base_pos, imu_data)
+        self.pub_nav_msg(body_data, imu_data)
         self.pub_imu_msg(imu_data)
         self.pub_joint_msg(leg_data, eff_data)
 

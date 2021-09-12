@@ -112,6 +112,7 @@ public:
 
 private:
   void _SetupCommand(StateEstimatorContainer<float> &_stateEstimator, std::vector<double> gamepadCommand);
+  void _SetupCommandForStand(StateEstimatorContainer<float> &_stateEstimator, std::vector<double> gamepadCommand);
 
   float _yaw_turn_rate = 0.;
   float _yaw_des;
