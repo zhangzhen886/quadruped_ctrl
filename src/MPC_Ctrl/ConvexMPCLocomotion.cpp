@@ -119,12 +119,12 @@ void ConvexMPCLocomotion::_SetupCommandForStand(
     std::vector<double> gamepadCommand) {
 
   float roll_cmd, pitch_cmd, yaw_cmd, height_cmd;
-  float roll_filter(0.1), pitch_filter(0.1), yaw_filter(0.1), height_filter(0.1);
+  float roll_filter(0.01), pitch_filter(0.01), yaw_filter(0.01), height_filter(0.01);
 
-  height_cmd = (0.25 + gamepadCommand[0] / 10.0);
-  yaw_cmd = (gamepadCommand[1] / 2.0);
-  roll_cmd = (gamepadCommand[2] / 2.0);
-  pitch_cmd = (gamepadCommand[3] / 2.0);
+  height_cmd = (0.25 + gamepadCommand[0] / 1.0);
+  yaw_cmd = (gamepadCommand[1] / 1.0);
+  roll_cmd = (gamepadCommand[2] / 1.0);
+  pitch_cmd = (gamepadCommand[3] / 1.0);
 
   _x_vel_des = 0.0;
   _y_vel_des = 0.0;
@@ -143,6 +143,14 @@ void ConvexMPCLocomotion::_SetupCommandForStand(
     _pitch_des = 0.35;
   else if (_pitch_des < -0.35)
     _pitch_des = -0.35;
+  if (_yaw_des > 0.5)
+    _yaw_des = 0.5;
+  else if (_yaw_des < -0.5)
+    _yaw_des = -0.5;
+  if (_body_height > 0.35)
+    _body_height = 0.35;
+  else if (_body_height < 0.15)
+    _body_height = 0.15;
 }
 
 // 在GaitCtrller::ToqueCalculator中调用
