@@ -398,7 +398,7 @@ class QuadSimulator:
 
     def run(self):
         # get data from simulator
-        imu_data, leg_data, body_data = self.get_data_from_sim()
+        imu_data, leg_data, pos_data = self.get_data_from_sim()
 
         # call cpp function to calculate mpc tau
         tau = self.cpp_gait_ctrller.toque_calculator(convert_type(
@@ -418,7 +418,7 @@ class QuadSimulator:
             try:
                 # rospy.loginfo("call robot RLController server...")
                 robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
-                rl_torque_results = robot_RLcontroller(body_data, imu_data, leg_data, eff_data).torque
+                rl_torque_results = robot_RLcontroller(pos_data, imu_data, leg_data, eff_data).torque
             except rospy.ServiceException as e:
                 print("Service call failed: %s"%e)
 
@@ -434,7 +434,7 @@ class QuadSimulator:
         # p.resetDebugVisualizerCamera(2.5, 45, -30, body_data)
 
         # pub ros msg
-        self.pub_nav_msg(body_data, imu_data)
+        self.pub_nav_msg(pos_data, imu_data)
         self.pub_imu_msg(imu_data)
         self.pub_joint_msg(leg_data, eff_data)
 
