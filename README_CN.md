@@ -2,7 +2,7 @@
 
 #### 订阅的话题：
 
-**"~/cmd_vel"** 包含linear和angular两个子项，其中在运动步态下linear.x和linear.y分别用于控制机器人的前向/侧向移动，angular.x控制旋转的角速度；在站立状态下，linear.x用于控制机器人身体的高度（在标准高度上下浮动），angular.x和angular.y分别控制机器人身体的俯仰（pitch）和横滚（roll）角度。
+**"~/cmd_vel"** 包含linear和angular两个子项，其中在运动步态下linear.x和linear.y分别用于控制机器人的前向/侧向移动，angular.x控制旋转的角速度；在站立状态下，linear.x用于控制机器人身体的高度（在标准高度上下浮动），linear.y控制身体的朝向角（yaw），angular.x和angular.y分别控制机器人身体的俯仰（pitch）和横滚（roll）角度。
 
 #### 发布的话题：
 

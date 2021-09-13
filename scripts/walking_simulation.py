@@ -412,6 +412,12 @@ class QuadSimulator:
                                         jointIndices=self.motor_id_list,
                                         controlMode=p.TORQUE_CONTROL,
                                         forces=eff_data)
+            # send data to RL Imitator
+            try:
+                robot_RLcontroller = rospy.ServiceProxy('quad_rl_controller', QuadRLController)
+                robot_RLcontroller(pos_data, imu_data, leg_data, eff_data).torque
+            except rospy.ServiceException as e:
+                print("Service call failed: %s"%e)
         else:
             rl_torque_results = tuple()
             # call RL server to calculate tau
