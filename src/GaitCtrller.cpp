@@ -74,6 +74,7 @@ void GaitCtrller::SetLegData(double* motorData) {
   }
 }
 
+// 只在reset步骤中
 void GaitCtrller::PreWork(double* imuData, double* motorData) {
   SetIMUData(imuData);
   SetLegData(motorData);

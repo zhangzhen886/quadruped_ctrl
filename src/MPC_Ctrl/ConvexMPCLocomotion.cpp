@@ -118,30 +118,23 @@ void ConvexMPCLocomotion::_SetupCommandForStand(
     StateEstimatorContainer<float>& _stateEstimator,
     std::vector<double> gamepadCommand) {
 
-  float x_vel_cmd, y_vel_cmd, yaw_vel_cmd;
-  float roll_filter(0.1), pitch_filter(0.1);
+  float roll_cmd, pitch_cmd, yaw_cmd, height_cmd;
+  float roll_filter(0.1), pitch_filter(0.1), yaw_filter(0.1), height_filter(0.1);
 
-  //手柄数据先暂时设置为0，后面再给手柄赋值   旋转角速度和x,y方向上的线速度
-  x_vel_cmd = gamepadCommand[0];
-  y_vel_cmd = gamepadCommand[1];
-  yaw_vel_cmd = gamepadCommand[2];
+  height_cmd = (0.25 + gamepadCommand[0] / 10.0);
+  yaw_cmd = (gamepadCommand[1] / 2.0);
+  roll_cmd = (gamepadCommand[2] / 2.0);
+  pitch_cmd = (gamepadCommand[3] / 2.0);
 
   _x_vel_des = 0.0;
   _y_vel_des = 0.0;
   _yaw_turn_rate = 0.0;
 
-  //涉及到了状态估计中的欧拉角
-  _yaw_des = _stateEstimator.getResult().rpy[2] + dt * _yaw_turn_rate;
-  //确保机器人不会因为摩擦力的原因在yaw方向产生旋转误差
-  if((abs(_stateEstimator.getResult().rpy[2] - _yaw_des_true) > 5.0)){
-    // _yaw_des_true = 3.14 * _stateEstimator.getResult().rpy[2] / abs(_stateEstimator.getResult().rpy[2]);
-    _yaw_des_true = _stateEstimator.getResult().rpy[2];
-  }
-  _yaw_des_true =_yaw_des_true + dt * _yaw_turn_rate;
+  _body_height = _body_height * (1 - height_filter) + height_cmd * height_filter;
+  _yaw_des = _yaw_des * (1 - yaw_filter) + yaw_cmd * yaw_filter;
+  _roll_des = _roll_des * (1 - roll_filter) + roll_cmd * roll_filter;
+  _pitch_des = _pitch_des * (1 - pitch_filter) + pitch_cmd * pitch_filter;
 
-  _roll_des = _roll_des * (1 - roll_filter) + gamepadCommand[2] * roll_filter;
-  _pitch_des = _pitch_des * (1 - pitch_filter) + gamepadCommand[3] * pitch_filter;
-  _body_height = 0.25 + gamepadCommand[0] / 10.0;
   if (_roll_des > 0.35)
     _roll_des = 0.35;
   else if (_roll_des < -0.35)
@@ -152,6 +145,7 @@ void ConvexMPCLocomotion::_SetupCommandForStand(
     _pitch_des = -0.35;
 }
 
+// 在GaitCtrller::ToqueCalculator中调用
 template <>
 void ConvexMPCLocomotion::run(Quadruped<float>& _quadruped,
                               LegController<float>& _legController,
@@ -558,10 +552,12 @@ void ConvexMPCLocomotion::updateMPCIfNeeded(
     // x_comp_integral);
 
     if (current_gait == 4) {
+      // Standing mode
       float trajInitial[12] = {
           _roll_des,
           _pitch_des /*-hw_i->state_estimator->se_ground_pitch*/,
-          (float)stand_traj[5] /*+(float)stateCommand->data.stateDes[11]*/,
+          // (float)stand_traj[5] /*+(float)stateCommand->data.stateDes[11]*/,
+          _yaw_des,
           (float)stand_traj[0] /*+(float)fsm->main_control_settings.p_des[0]*/,
           (float)stand_traj[1] /*+(float)fsm->main_control_settings.p_des[1]*/,
           (float)_body_height /*fsm->main_control_settings.p_des[2]*/,
@@ -575,7 +571,6 @@ void ConvexMPCLocomotion::updateMPCIfNeeded(
       for (int i = 0; i < horizonLength; i++)
         for (int j = 0; j < 12; j++) trajAll[12 * i + j] = trajInitial[j];
     }
-
     else {
       const float max_pos_error = .1;
       float xStart = world_position_desired[0];
@@ -592,7 +587,7 @@ void ConvexMPCLocomotion::updateMPCIfNeeded(
 
       float trajInitial[12] = {(float)rpy_comp[0],  // 0
                                (float)rpy_comp[1],  // 1
-                               _yaw_des_true,            // 2
+                               _yaw_des_true,       // 2
                                // yawStart,    // 2
                                xStart,               // 3
                                yStart,               // 4
